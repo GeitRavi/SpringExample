@@ -1,1 +1,745 @@
-Ravi
+package com.cadreon.qa.framework.common.listner;
+
+import static com.jayway.restassured.RestAssured.given;
+
+import java.awt.AWTException;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
+
+import org.testng.ITestContext;
+import org.testng.ITestListener;
+import org.testng.ITestResult;
+
+import com.cadreon.qa.framework.api.Configuration;
+import com.cadreon.qa.framework.reporting.CustomMethodReport;
+import com.jayway.restassured.RestAssured;
+import com.jayway.restassured.parsing.Parser;
+
+public class TestListener implements ITestListener {
+
+    public Map<String, Integer> testcasesMap;
+
+    public static final int TEST_FAILED = 5;
+    public static final int TEST_PASSED = 1;
+    public static String description=null;
+
+ public static CustomMethodReport customMethodReport;
+	// public static Integer runId = 0;
+    public static Integer testcaseId = 0;
+    protected static Properties p = null;
+   
+    
+    public static String getDescription() {
+ 		return description;
+ 	}
+
+ 	public static void setDescription(String Description) {
+ 		description = Description;
+ 	}
+
+ 
+
+    @Override
+    public void onTestStart(ITestResult result) {
+	System.out.println("on test method " + getTestMethodName(result) + " start");
+	// AutomatedTestCases t = new AutomatedTestCases();
+	// testcasesMap = t.setTtagAPITestcasesMap();
+	// System.out.println("Paramerters are = " + result.getParameters()[0]);
+    }
+
+    @Override
+    public void onTestSuccess(ITestResult result) {
+	p = new Properties();
+	customMethodReport=new CustomMethodReport();
+	try {
+	    p.load(new FileReader(new File("config.properties")));
+	} catch (FileNotFoundException e) {
+	    // TODO Auto-generated catch block
+	    e.printStackTrace();
+	} catch (IOException e) {
+	    // TODO Auto-generated catch block
+	    e.printStackTrace();
+	}
+	
+	// StestcasesMap.get(result.getName());
+	System.out.println("on test method " + getTestMethodName(result) + " success");
+	String name = result.getName();
+	// runId = Integer.parseInt(result.getParameters()[0].toString());
+	System.out.println("Paramerters are = " + Configuration.env);
+	System.out.println(result.getMethod().getDescription());
+	
+	if (result.getMethod().getDescription().equals("dataProvider"))
+	{
+		testcaseId = Integer.parseInt(getDescription());
+	}
+	else
+	{
+	testcaseId = Integer.parseInt(result.getMethod().getDescription());
+	}
+	
+	
+	System.out.println("Case Id = " + testcaseId);
+	updateResultToTestRail(name, TEST_PASSED);
+    }
+       
+    @Override
+    public void onTestFailure(ITestResult result) {
+    	customMethodReport=new CustomMethodReport();
+    	if (result.getMethod().getDescription().equals("dataProvider"))
+    	{
+    		testcaseId = Integer.parseInt(getDescription());
+    	}
+    	else
+    	{
+    	testcaseId = Integer.parseInt(result.getMethod().getDescription());
+    	}
+    	
+    	try {
+    		customMethodReport.captureScreenshot(testcaseId);
+    	} catch (AWTException e) {
+    		// TODO Auto-generated catch block
+    		e.printStackTrace();
+    	} catch (IOException e) {
+    		// TODO Auto-generated catch block
+    		e.printStackTrace();
+    	}
+	String name = result.getName();
+	updateResultToTestRail(name, TEST_FAILED);
+    }
+    
+    @Override
+    public void onTestSkipped(ITestResult result) {
+
+	System.out.println("test method " + getTestMethodName(result) + " skipped");
+
+    }
+
+    @Override
+    public void onTestFailedButWithinSuccessPercentage(ITestResult result) {
+	System.out.println("test failed but within success % " + getTestMethodName(result));
+    }
+
+    @Override
+    public void onStart(ITestContext context) {
+	System.out.println("on start of test " + context.getName());
+    }
+
+    @Override
+    public void onFinish(ITestContext context) {
+	System.out.println("on finish of test " + context.getName());
+    }
+
+    private static String getTestMethodName(ITestResult result) {
+	return result.getMethod().getConstructorOrMethod().getName();
+    }
+
+    public void updateResultToTestRail(String name, Integer result) {
+
+    	// RestAssured.baseURI = "https://cadreon.testrail.net/";
+    	RestAssured.baseURI = "http://52.3.82.160/testrail/";
+    	RestAssured.defaultParser = Parser.JSON;
+
+    	// Integer testcaseId = testcasesMap.get(name);
+    	Map<String, Object> m = new HashMap<>();
+    	m.put("status_id", result);
+    	m.put("comment", "This is automated test run result");
+    	m.put("version", Configuration.buildVersion);
+//    	m.put("case_id", testcaseId);
+
+    	// String out =
+    	// given().auth().form("manohar.eerabathini@cadreon.com","Mano0413").header("Content-Type",
+    	// "application/json").body(m).when().post("index.php?/api/v2/add_result_for_case/98/7619").asString();
+    	String out = given().auth().preemptive().basic("testrail.automation@cadreon.com", "cadreon123").body(m).when().header("Content-Type", "application/json")
+    		.post("index.php?/api/v2/add_result_for_case/" + Configuration.runId + "/" + testcaseId).asString();
+    	System.out.println("result2=" + out);
+        }
+    
+    
+    
+    
+}
+
+==============================================================================================
+
+package com.cadreon.qa.framework.reporting;
+
+import java.awt.AWTException;
+import java.awt.Rectangle;
+import java.awt.Robot;
+import java.awt.Toolkit;
+import java.awt.image.BufferedImage;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Properties;
+
+import javax.imageio.ImageIO;
+
+
+
+
+public class CustomMethodReport {
+	
+	public static HashMap hm = new HashMap();
+	
+	
+	/* Method Name: createFolderorFile
+	 * Description: 
+	 * 		This method will create the folder/file
+	 * Parameters: Function accepts 2 parameters
+	 * 		1. isFile- boolean: true- if we want to create a file. false- if we want to create folder
+	 * 		2. folderOrFile- File: File type object that speicifies the path of file/folder
+	 * */
+	
+	public File createFolderorFile(boolean isFile, File folderOrFile) throws IOException
+	{
+		if(isFile)
+		{
+			if(!folderOrFile.exists())
+				folderOrFile.createNewFile();			
+		} else {
+			if(!folderOrFile.exists())
+			{
+				folderOrFile.mkdir();
+			}
+		}
+		return folderOrFile;
+	}
+	
+	/* Method Name: startHtmlPage
+	 * Description: 
+	 * 		This method will generate the Header of internal execution html report
+	 * Parameters: 
+	 * 		1. out- PrintWriter- handle of html file generated using createWriter method 
+	
+	 * */
+	
+	public void startHtmlPage(PrintWriter out) throws IOException
+	{
+		out.println("<html>");
+		out.println("<head>");
+		
+		//Java Script function to generate the S.No.Column
+		String jsFunction = "function GenerateColId() { var tableId = document.getElementById('reportTable'); var cols = tableId.rows[0].cells.length; var a =1;" +
+				"for(var i =1; i < tableId.rows.length; i++) {	tableId.rows[i].cells[0].innerText = a; a++;}}";
+
+		out.println("<Script>" + jsFunction + "</Script>" + "</head>");
+		out.println("<title> My Custom Report Methods</title>");
+	
+		out.println("</head>");
+		
+		out.println("<body onload = GenerateColId()><br/>");
+
+		// This will generate the header of the html for the internal html
+		
+		out.println("<table border='1' width='100%' id = \"reportTable\"> " +
+						"<tr bgcolor=\"grey\">" +
+							"<td>S.No.</td>" +
+							"<td>Date</td>" +
+							"<td>Time</td>" +
+							"<td>Action</td>" +
+							"<td>Expected Result</td>" +
+							"<td>Actual Result</td>" +
+							"<td>Screenshot</td>" +
+							"<td>Status</td>" +
+						"</tr>");
+		
+	}
+	
+	/* Method Name: generateExecutionReport
+	 * Description: 
+	 * 		This method will generate the execution report of internal execution
+	 * Parameters: 
+	 * 		1. out- PrintWriter
+	 * 		2. action- String: Action of test case
+	 * 		3. expectedResult: Expected Result of Test Case
+	 * 		4. actualResutl: Actual Result of Test case
+	 * 		5. isPassed: Boolean- true if test case is passed false otherwise
+	 * 		6. screenshot: Path of screenshot taken during failures
+	 * */
+	
+	public void generateExecutionReport(PrintWriter out, String action, String expectedResult, String actualResult, boolean isPassed, String screenshot) {
+		
+		SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+		SimpleDateFormat timeFormat = new SimpleDateFormat("HH:mm:ss");
+		
+		if(expectedResult==null || expectedResult=="")
+		{
+			out.println("<tr>" +
+					  "<td colspan=\"8\" height = 10 align = center bgcolor = lightgrey>" + action + "</td>" + 
+					  "</tr>"	
+					 );
+		} else {
+			out.println(
+					(isPassed == true ? "<tr bgcolor = lightgreen>" : "<tr bgcolor = \"FF6666\">") +
+						  "<td>" + "</td>" +
+						  "<td width = \"8%\">" + dateFormat.format(new Date()) + "</td>" +
+						  "<td>" + timeFormat.format(new Date().getTime()) + "</td>" +
+						  "<td>" + action + "</td>" +
+						  "<td>" + expectedResult + "</td>" +
+						  "<td>" + actualResult + "</td>" +
+						  "<td><a target = \"_blank\"" + " href=" + '"' + (screenshot==null ? "" : screenshot) + '"'  + ">" +(screenshot == null ? "" : screenshot)+ "</a></td>" +
+						  "<td>" + (isPassed == true ? "PASS" : "FAIL") + "</td>" +
+						  "</tr>"
+				);
+		}
+		
+		out.flush();
+		
+	}
+	
+	/** Finishes HTML Stream */
+	public void endHtmlPage(PrintWriter out)
+	{
+		out.println("</table></body></html>");
+	}
+	
+	
+	/*
+	 * Description: This Method will Create a file of html type and return the handle of file
+	 * parameter: method: String- This method accepts the a String that contains the method name. 
+	 * 								Html file will be create using this method name 
+	
+	 * */
+	public PrintWriter createWriter(String methodName) throws IOException
+	{
+		System.out.println("create writer method");
+		
+		//Read the Property file value
+		Properties prop = new Properties();
+		InputStream inputConfig = new FileInputStream("config.properties");
+		prop.load(inputConfig);
+		String folder = prop.get("INTERNAL_REPORT").toString();
+		
+		File directory = new File ("");
+		String absolutepath	=	directory.getAbsolutePath();
+		
+		//This is to get location for creating log file. This value is comming from build.xml 
+		String str_reportFilePath = absolutepath+File.separator+folder;
+		
+		File f1 = new File(str_reportFilePath);
+		File outFolder = createFolderorFile(false, f1);
+		
+		int reportCount = outFolder.list().length + 1;
+		String reportName = methodName + "_"+ reportCount + ".html";
+		
+		String reportPath = outFolder + "\\" + reportName ;
+		
+		//put the file name in HashMap against method Name. This hashmap is used for the linking of internal verification and overall execution reoport
+		
+		hm.put(methodName, reportPath);
+		
+		return new PrintWriter(new BufferedWriter(new FileWriter(new File(outFolder, reportName))));
+	}
+	
+	
+	/* Method Name: captureScreenshot
+     * Description:This method will capture the screenshot of the screen
+     * Parameters: 
+     *            
+     
+     * */
+	
+	public String captureScreenshot(Integer testcaseId) throws AWTException, IOException
+	{
+		Properties prop = new Properties();
+		InputStream inputConfig = new FileInputStream("config.properties");
+		prop.load(inputConfig);
+		String folder = prop.getProperty("screenShotFolder");
+		File directory = new File ("");
+		String absolutepath=directory.getAbsolutePath();
+		//This is to get location for creating log file. This value is comming from build.xml 
+	      String snapshotFolder = absolutepath+File.separator+folder;
+		System.out.println(snapshotFolder );	
+		File f1 = new File(snapshotFolder);
+		if(!f1.exists())
+		{
+			f1.mkdir();
+			System.out.println("make directory "+snapshotFolder );
+		}
+		SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+		Date date = new Date();
+		String snapshotDirName = dateFormat.format(date);
+		System.out.println(snapshotFolder +File.separator + snapshotDirName );
+		File currentDateSnapshot = new File(snapshotFolder + File.separator + snapshotDirName);
+		if(!currentDateSnapshot.exists())
+			currentDateSnapshot.mkdir();
+		boolean isSnapshotTaken = false;
+		boolean isFileCreated = false;
+		int imageName = testcaseId ;
+		String imagePath = currentDateSnapshot + File.separator + imageName + ".png";
+		Rectangle screenRect = new Rectangle(Toolkit.getDefaultToolkit().getScreenSize());
+		BufferedImage capture = new Robot().createScreenCapture(screenRect);
+		isSnapshotTaken = ImageIO.write(capture, "png", new File(imagePath));
+		System.out.println(isSnapshotTaken == true ? "Snapshot is taken." : "Snapshot is not taken.");
+		return imagePath;
+		
+	}
+		
+}
+-------------------------------------------------------------------------------------------
+package com.cadreon.qa.framework.reporting;
+
+import java.io.File;
+import java.io.IOException;
+
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+
+import org.w3c.dom.Document;
+import org.xml.sax.SAXException;
+
+public class ParseXmlResult {
+
+    public static void main(String[] args) {
+	parseResults();
+    }
+
+    public static void parseResults() {
+	// String path =
+	// System.getProperty("user.dir")+"/test-output/testng-results.xml";
+
+	String path = System.getProperty("user.dir") + "/test-output/testng-results.xml";
+
+	try {
+	    File fXmlFile = new File(path);
+
+	    DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+	    DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+	    Document doc = dBuilder.parse(fXmlFile);
+
+	    doc.getDocumentElement().normalize();
+
+	    System.out.println("Total : " + doc.getDocumentElement().getAttribute("total"));
+	    System.out.println("Passed : " + doc.getDocumentElement().getAttribute("passed"));
+	    System.out.println("Failed : " + doc.getDocumentElement().getAttribute("failed"));
+	    System.out.println("Skipped : " + doc.getDocumentElement().getAttribute("skipped"));
+	} catch (SAXException e) {
+	    // TODO Auto-generated catch block
+	    e.printStackTrace();
+	} catch (IOException e) {
+	    // TODO Auto-generated catch block
+	    e.printStackTrace();
+	} catch (ParserConfigurationException e) {
+	    // TODO Auto-generated catch block
+	    e.printStackTrace();
+	}
+    }
+}
+--------------------------------------------------------------------------------------------
+package com.cadreon.qa.framework.reporting;
+
+import java.awt.Desktop;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+import javax.swing.JOptionPane;
+
+import org.testng.IReporter;
+import org.testng.IResultMap;
+import org.testng.ISuite;
+import org.testng.ISuiteResult;
+import org.testng.ITestContext;
+import org.testng.ITestNGMethod;
+import org.testng.ITestResult;
+import org.testng.xml.XmlSuite;
+
+
+
+public class ReportPublisher implements IReporter {
+	
+	public static PrintWriter  f_out;
+	CustomMethodReport cm = new CustomMethodReport();
+	File path=null;
+	/*
+	 * Description: This method will generate the report with overall execution status. 
+	 * Pass results are marked in green color while failed in red.
+	 * This method is provided by TestNG. We are overriding this method and providing our customization to generated the report.
+	 * */
+	
+	@Override
+	public void generateReport(List<XmlSuite> arg0, List<ISuite> suites, String outdir)
+	{
+		//Create the html file using createWriter method
+		try {
+			f_out = createWriter();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		
+		ITestContext tc = null;
+		
+		//Generate the body of html file and attach the logo
+		
+		try {
+			startHtmlPage(f_out);
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		for (ISuite suite : suites) {
+        //Following code gets the suite name
+        String suiteName = suite.getName();
+            
+	    //Getting the results for the said suite
+	    Map<String, ISuiteResult> suiteResults = suite.getResults();
+	    
+		for (ISuiteResult sr : suiteResults.values()) {
+	    	tc = sr.getTestContext();
+	      }
+		//Getting all passed test cases
+		IResultMap passedTests = tc.getPassedTests();
+		
+		//Getting all failed test cases
+		IResultMap failedTests = tc.getFailedTests();
+		
+		int totalTestCases = passedTests.size() + failedTests.size();
+			
+		// Generate the header of report
+		
+		f_out.println("<table border='1' width='1000' id = \"reportTable\">");
+		
+
+		f_out.println("<tr bgcolor=\"#ADD8E6\">" +
+				"<td colspan=\"3\" align = \"center\">" +
+				"Total Test Cases: " + totalTestCases +	"&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Passed: " + passedTests.size() + "&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Failed: " + failedTests.size() +
+				"</td></tr>");
+		f_out.println("<tr bgcolor=\"grey\">" +
+				"<td>S.No.</td>" +
+				"<td>Test Methods</td>" +
+				"<td>Status</td>" +
+			"</tr>");
+		
+	      // Print all passed test cases
+		
+	      for( ITestResult r: passedTests.getAllResults()) {
+	    	  
+	    	  f_out.println("<tr bgcolor = lightgreen>" +
+					  "<td>" + "</td>" +
+					  "<td><a" + " href=" + '"' + cm.hm.get(r.getName())+ '"'  + ">" +r.getName() + "</a></td>" + //target = \"_blank\"
+					  "<td>" + "Pass" + "</td>" +
+					  "</tr>");  
+	      }
+	      
+		// Print all failed test cases
+	      for( ITestResult r1: failedTests.getAllResults()) {
+	    	  f_out.println("<tr bgcolor = \"FF6666\">" +
+					  "<td>" + "</td>" +
+					  "<td><a" + " href=" + '"' + cm.hm.get(r1.getName()) + '"'  + ">" +r1.getName() + "</a></td>" + //target = \"_blank\"
+					  "<td>" + "Fail" + "</td>" +
+					  "</tr>");   
+	      }
+        }
+		
+		endHtmlPage(f_out);
+
+		//Open the Report after execution of all test cases
+		try {
+			Desktop.getDesktop().open(path);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		f_out.flush();
+		f_out.close();
+		
+	}
+	
+	
+	/* Method Name: startHtmlPage
+	 * Description: 
+	 * 		This method will start generating the html file and set the logo of application 
+	 * Parameters: 
+	 * 		1. out- PrintWriter- handle of html file generated using createWriter method 
+	  * */
+	
+	public void startHtmlPage(PrintWriter out) throws IOException
+	{
+		File logoDir = new File("");
+		String absolutePath = logoDir.getAbsolutePath();
+		File logoFile = new File(absolutePath+"\\Cadreon_logo.jpg");
+		
+	
+		System.out.println("dd");
+		FileWriter oReportSummaryWriter;
+		
+		oReportSummaryWriter = new FileWriter(logoDir.getAbsoluteFile());
+
+		
+		
+		 oReportSummaryWriter.write("<html>");
+		 oReportSummaryWriter.write("\r\n");
+        oReportSummaryWriter.write("<style>");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".subheading { BORDER-RIGHT:#000000 1px solid;PADDING-RIGHT: 4px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 4px;FONT-WEIGHT: bold;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px solid;COLOR: #000000;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri,helvetica, sans-serif;HEIGHT: 20px;BACKGROUND-COLOR: #FAC090;Color: #000000}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".subheading1{BORDER-RIGHT: #000000 1px solid;BACKGROUND-COLOR: #CCC0DA;PADDING-RIGHT: 4px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 4px;FONT-WEIGHT: bold;FONT-SIZE: 13pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px solid;COLOR: #000000;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri,helvetica, sans-serif;HEIGHT: 10px;}");
+        oReportSummaryWriter.write("\r\n");
+
+        //oReportSummaryWriter.write(".subheading2{BORDER-RIGHT: #000000 1px solid;PADDING-RIGHT: 2px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 2px;FONT-WEIGHT: bold;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px solid;COLOR: #000000;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri,helvetica, sans-serif;HEIGHT: 10px;BACKGROUND-COLOR: #C2DC9A;Color: #000000}");
+        oReportSummaryWriter.write(".subheading2{BORDER-RIGHT: #000000 1px solid;PADDING-RIGHT: 2px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 2px;FONT-WEIGHT: bold;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px solid;COLOR: #000000;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri,helvetica, sans-serif;HEIGHT: 10px;BACKGROUND-COLOR: #6699cc;Color: #000000}");
+        
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".tdborder_1{BORDER-RIGHT: #000000 1px solid;PADDING-RIGHT: 4px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 4px;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px solid;COLOR: #000000;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri, helvetica,  sans-serif;HEIGHT: 20px}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".tdborder_1_Pass{BORDER-RIGHT: #000000 1px solid;PADDING-RIGHT: 4px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 4px;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px solid;COLOR: #00ff00;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri,  helvetica, sans-serif;HEIGHT: 20px}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".SnapShotLink_style{PADDING-RIGHT: 4px;PADDING-LEFT: 4px;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;COLOR: #0000EE;PADDING-TOP: 0px;FONT-FAMILY: Calibri, helvetica, sans-serif;HEIGHT: 20px}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".tdborder_1_Fail{BORDER-RIGHT: #000000 1px solid;PADDING-RIGHT: 4px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 4px;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px solid; COLOR: #ff0000;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri, helvetica, sans-serif;HEIGHT: 20px}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".tdborder_1_Done{BORDER-RIGHT: #000000 1px solid;PADDING-RIGHT: 4px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 4px;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px solid; COLOR: #ffcc00;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri,  helvetica, sans-serif;HEIGHT: 20px}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".tdborder_1_Skipped{BORDER-RIGHT: #000000 1px solid;PADDING-RIGHT: 4px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 4px;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px  solid;COLOR: #00ccff;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri, helvetica, sans-serif;HEIGHT: 20px}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".tdborder_1_Warning{BORDER-RIGHT: #000000 1px solid;PADDING-RIGHT: 4px;BORDER-TOP: #000000 1px solid;PADDING-LEFT: 4px;FONT-SIZE: 12pt;PADDING-BOTTOM: 0px;BORDER-LEFT: #000000 1px solid;COLOR: #660066;PADDING-TOP: 0px;BORDER-BOTTOM: #000000 1px solid;FONT-FAMILY: Calibri, helvetica, sans-serif;HEIGHT: 20px}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".heading {FONT-WEIGHT: bold; FONT-SIZE: 17px; COLOR: #005484;FONT-FAMILY: Calibri, Verdana, Tahoma, Calibri;}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".style1 { border: 1px solid #8eb3d8;padding: 0px 4px;FONT-WEIGHT: bold;FONT-SIZE: 12pt;COLOR: #000000;FONT-FAMILY: Calibri, helvetica, sans-serif;HEIGHT: 20px;width: 180px;}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write(".style3 { border: 1px solid #8eb3d8;padding: 0px 4px;FONT-WEIGHT: bold;FONT-SIZE: 12pt;COLOR: #000000;FONT-FAMILY: Calibri, helvetica, sans-serif;HEIGHT: 20px;width: 2px;}");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write("</style>");
+        oReportSummaryWriter.write("\r\n");
+
+
+        oReportSummaryWriter.write("<head><title>" + ",klk" + " Test Result</title></head>");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write("<body vlink=\"FF00FF\">");
+        oReportSummaryWriter.write("\r\n");
+
+        oReportSummaryWriter.write("<table cellSpacing='0' cellPadding='0' border='0' align='center' style='width:96%;" +
+                                " margin-left:20px;'><td class='subheading1' colspan=5 align=center><p style='font-size:1.8em'>" +
+                                "<body link='#00ff00' vlink=\"FF00FF\">" +"asasa"+ " Test Execution Report </body></td><tr></tr></table>");
+        oReportSummaryWriter.write("\r\n");
+        
+		System.out.println("welcome to hell");
+		
+		
+		
+		
+		
+		out.println("<html>");
+		out.println("<html");
+		out.println("<head>");
+		
+		//Java Script function to generate the S.No.Column
+		String jsFunction = "function GenerateColId() { var tableId = document.getElementById('reportTable'); var cols = tableId.rows[0].cells.length; var a =1;" +
+				"for(var i =2; i < tableId.rows.length; i++) {tableId.rows[i].cells[0].innerText = a; a++;}}";
+
+		out.println("<Script>" + jsFunction + "</Script>" + "</head>");
+		out.println("<title> My Custom Report </title>");
+	
+		out.println("</head>");
+		
+		out.println("<body bgcolor =\"#F0FFFF\" onload = GenerateColId()><br/>");
+		out.println("<h2 style=\"font-family:verdana;\"> <img src=\""+ logoFile +"\">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Test Case Execution Report</img></h2>");
+		
+		out.flush();
+		
+	}
+	
+	/*
+	 * Description: This Method will finishes the html stream.
+	 * Parameter: out: PrintWriter- It is the handle of html file.			
+	  * 
+	 * */
+	
+	private void endHtmlPage(PrintWriter out)
+	{
+		out.println("</table>");
+		out.println("</body></html>");
+	}
+	
+	
+	/*
+	 * Description: This Method will Create a file of html type and return the handle of file.
+	 * 				A folder will be created that is provided in the property file that has name as "finalExecutionReport"			
+	
+	 * 
+	 * */
+	
+	public PrintWriter createWriter() throws IOException
+	{	
+		Properties prop = new Properties();
+		InputStream inputConfig = new FileInputStream("config.properties");
+		prop.load(inputConfig);
+		
+		String folder = prop.getProperty("finalExecutionReport");
+		
+		File directory = new File ("");
+		
+		//Fetch the absolute path of project
+		String absolutepath	=	directory.getAbsolutePath();
+		String str_reportFilePath = absolutepath+File.separator+folder;
+		File f1 = new File(str_reportFilePath);
+		
+		// Create the folder with the name provided in property file
+		File outFolder = cm.createFolderorFile(false, f1);
+		
+		SimpleDateFormat dateFormat = new SimpleDateFormat("dd-MM-yyyy");
+		Date date = new Date();
+		
+		String reportDirName = dateFormat.format(date);
+		
+		File currentDateReportFolder = new File(outFolder + "\\" + reportDirName);
+		
+		// Create a folder with the Current Date
+		if(!currentDateReportFolder.exists())
+			currentDateReportFolder.mkdir();
+		
+		SimpleDateFormat timeFormat = new SimpleDateFormat("HH-mm-ss");
+		Date time = new Date();
+		
+		String tim1 = timeFormat.format(time);
+		
+		//Append the time in html file.
+		String rPath = "Cadreon Execution Report_" + tim1;
+		path = new File(currentDateReportFolder + "\\" + rPath + ".html") ;
+		return new PrintWriter(new BufferedWriter(new FileWriter(new File(currentDateReportFolder, rPath + ".html"))));
+	}
+}
+
+===========================================================================================================
+
